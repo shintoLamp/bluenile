@@ -39,3 +39,134 @@ specialty_lookup <- function(columns) {
     janitor::clean_names() %>%
     dplyr::select(dplyr::all_of(columns))
 }
+
+#' Function to assign Health Board names based on 5-digit hospital location code
+#'
+#' @param df The data frame you want to change
+#' @param locationcode The name of the location code variable in df
+#' @param hbcode The name of the Health Board code in df
+#'
+#' @return df with one extra column, hosp_board
+#' @export
+#'
+#' @examples
+#' example_data <- base::data.frame(location = c("A0001", "B0002", "C0004"), hbres = c("", "", "S08000007"))
+#' where_is_hospital(example_data, location, hbres)
+where_is_hospital <- function(df, locationcode, hbcode) {
+  df %>% dplyr::mutate(
+    hosp_board = dplyr::case_when(
+      stringr::str_sub({{ locationcode }}, end = 1) == "A" ~ "Ayrshire & Arran Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "B" ~ "Borders Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "Y" ~ "Dumfries & Galloway Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "F" ~ "Fife Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "V" ~ "Forth Valley Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "N" ~ "Grampian Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "G" ~ "Greater Glasgow & Clyde Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "D" ~ "Golden Jubilee",
+      stringr::str_sub({{ locationcode }}, end = 1) == "H" ~ "Highland Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "L" ~ "Lanarkshire Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "S" ~ "Lothian Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "R" ~ "Orkney Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "Z" ~ "Shetland Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "T" ~ "Tayside Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "W" ~ "Western Isles Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "C" & {{ hbcode }} == "S08000007" ~ "Greater Glasgow & Clyde Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "C" & {{ hbcode }} == "S08000008" ~ "Highland Region",
+      stringr::str_sub({{ locationcode }}, end = 1) == "C" & {{ hbcode }} == "S27000001" ~ "Private Care"
+    )
+  )
+}
+
+#' Assign 9-digit Health Board code based on two-digit LA code
+#'
+#' @param df The dataframe you wish to mutate
+#' @param lcacodename The name of the two-digit LA code variable. Can be formatted as integer or character
+#'
+#' @return Mutated dataframe, with extra column 'hbres'
+#' @export
+#'
+#' @examples
+#' example_data <- base::data.frame(la = c(1, 3, 5, 7))
+#' twodigitla_to_hb(example_data, la)
+#'
+#' example_data_2 <- base::data.frame(la = c("01", "03", "05", "13"))
+#' twodigitla_to_hb(example_data_2, la)
+twodigitla_to_hb <- function(df, lcacodename) {
+  char_or_num <- df %>% is.factor({{lcacodename}}) | is.character({{lcacodename}})
+  if (char_or_num == FALSE) {
+    return_df <- df %>% dplyr::mutate(
+      hbres = dplyr::case_when(
+        {{ lcacodename }} == 1 ~ "S08000020",
+        {{ lcacodename }} == 2 ~ "S08000020",
+        {{ lcacodename }} == 3 ~ "S08000027",
+        {{ lcacodename }} == 4 ~ "S08000022",
+        {{ lcacodename }} == 5 ~ "S08000016",
+        {{ lcacodename }} == 6 ~ "S08000019",
+        {{ lcacodename }} == 7 ~ "S08000021",
+        {{ lcacodename }} == 8 ~ "S08000017",
+        {{ lcacodename }} == 9 ~ "S08000027",
+        {{ lcacodename }} == 10 ~ "S08000015",
+        {{ lcacodename }} == 11 ~ "S08000021",
+        {{ lcacodename }} == 12 ~ "S08000024",
+        {{ lcacodename }} == 13 ~ "S08000021",
+        {{ lcacodename }} == 14 ~ "S08000024",
+        {{ lcacodename }} == 15 ~ "S08000019",
+        {{ lcacodename }} == 16 ~ "S08000018",
+        {{ lcacodename }} == 17 ~ "S08000021",
+        {{ lcacodename }} == 18 ~ "S08000022",
+        {{ lcacodename }} == 19 ~ "S08000021",
+        {{ lcacodename }} == 20 ~ "S08000024",
+        {{ lcacodename }} == 21 ~ "S08000020",
+        {{ lcacodename }} == 22 ~ "S08000015",
+        {{ lcacodename }} == 23 ~ "S08000023",
+        {{ lcacodename }} == 24 ~ "S08000025",
+        {{ lcacodename }} == 25 ~ "S08000027",
+        {{ lcacodename }} == 26 ~ "S08000021",
+        {{ lcacodename }} == 27 ~ "S08000026",
+        {{ lcacodename }} == 28 ~ "S08000015",
+        {{ lcacodename }} == 29 ~ "S08000023",
+        {{ lcacodename }} == 30 ~ "S08000019",
+        {{ lcacodename }} == 31 ~ "S08000024",
+        {{ lcacodename }} == 32 ~ "S08000028"
+      )
+    )
+  } else {
+    return_df <- df %>% dplyr::mutate(
+      hbres = dplyr::case_when(
+        {{ lcacodename }} == "1" ~ "S08000020",
+        {{ lcacodename }} == "2" ~ "S08000020",
+        {{ lcacodename }} == "3" ~ "S08000027",
+        {{ lcacodename }} == "4" ~ "S08000022",
+        {{ lcacodename }} == "5" ~ "S08000016",
+        {{ lcacodename }} == "6" ~ "S08000019",
+        {{ lcacodename }} == "7" ~ "S08000021",
+        {{ lcacodename }} == "8" ~ "S08000017",
+        {{ lcacodename }} == "9" ~ "S08000027",
+        {{ lcacodename }} == "10" ~ "S08000015",
+        {{ lcacodename }} == "11" ~ "S08000021",
+        {{ lcacodename }} == "12" ~ "S08000024",
+        {{ lcacodename }} == "13" ~ "S08000021",
+        {{ lcacodename }} == "14" ~ "S08000024",
+        {{ lcacodename }} == "15" ~ "S08000019",
+        {{ lcacodename }} == "16" ~ "S08000018",
+        {{ lcacodename }} == "17" ~ "S08000021",
+        {{ lcacodename }} == "18" ~ "S08000022",
+        {{ lcacodename }} == "19" ~ "S08000021",
+        {{ lcacodename }} == "20" ~ "S08000024",
+        {{ lcacodename }} == "21" ~ "S08000020",
+        {{ lcacodename }} == "22" ~ "S08000015",
+        {{ lcacodename }} == "23" ~ "S08000023",
+        {{ lcacodename }} == "24" ~ "S08000025",
+        {{ lcacodename }} == "25" ~ "S08000027",
+        {{ lcacodename }} == "26" ~ "S08000021",
+        {{ lcacodename }} == "27" ~ "S08000026",
+        {{ lcacodename }} == "28" ~ "S08000015",
+        {{ lcacodename }} == "29" ~ "S08000023",
+        {{ lcacodename }} == "30" ~ "S08000019",
+        {{ lcacodename }} == "31" ~ "S08000024",
+        {{ lcacodename }} == "32" ~ "S08000028"
+      )
+    )
+  }
+  return(return_df)
+}

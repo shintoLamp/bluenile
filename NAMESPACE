@@ -3,6 +3,8 @@
 export("%>%")
 export(locality_lookup)
 export(specialty_lookup)
+export(twodigitla_to_hb)
+export(where_is_hospital)
 importFrom(dplyr,all_of)
 importFrom(dplyr,select)
 importFrom(glue,glue)

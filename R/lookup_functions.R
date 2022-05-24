@@ -208,3 +208,4 @@ lcaname_to_hb <- function(df, lcaname, region = FALSE) {
   if (region == TRUE) {
       return_df <- return_df %>% dplyr::mutate(hb = dplyr::if_else(hb != "Other Non Scottish Residents", base::paste0(stringr::str_sub(hb, 4, -1), " Region"), hb))
   }}
+

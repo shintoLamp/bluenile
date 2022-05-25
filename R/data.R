@@ -16,3 +16,14 @@
 #' @docType data
 #' @keywords data
 "lca_names"
+
+#' List with three levels, one for each security level on Source platform
+#'
+#' For reference
+#'
+#' @name workbook_names
+#' @docType data
+#' @keywords data
+"workbook_names"
+
+

@@ -184,6 +184,7 @@ twodigitla_to_hb <- function(df, lcacodename) {
 #' @export
 #'
 #' @examples
+#' lcaname_to_hb(bluenile::lca_names, lca, region = FALSE)
 lcaname_to_hb <- function(df, lcaname, region = FALSE) {
     return_df <- df %>% dplyr::mutate(
       hb = dplyr::case_when(

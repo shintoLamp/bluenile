@@ -183,6 +183,9 @@ twodigitla_to_hb <- function(df, lcacodename) {
 #' @return Dataframe with an extra column named hb
 #' @export
 #'
+#' @importFrom dplyr mutate case_when if_else
+#' @importFrom  stringr str_detect str_sub
+#'
 #' @examples
 #' lcaname_to_hb(bluenile::lca_names, lca, region = FALSE)
 lcaname_to_hb <- function(df, lcaname, region = FALSE) {

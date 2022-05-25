@@ -26,4 +26,12 @@
 #' @keywords data
 "workbook_names"
 
+#' List of vectors, each member of which is a variable from the SLFs.
+#'
+#' Used to extract correct variables from SLF
+#'
+#' @name variables_to_extract
+#' @docType data
+#' @keywords data
+"variables_to_extract"
 

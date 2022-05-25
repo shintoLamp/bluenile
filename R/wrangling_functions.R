@@ -8,6 +8,7 @@
 #'
 #' @importFrom dplyr filter
 #'
+#'
 #' @examples
 #' workbook_name <- "LTC"
 #' slfhelper::read_slf_individual("1819", from = 10000, to = 100000) %>% filter_the_slf(workbook_name, "level3")
@@ -27,5 +28,3 @@ filter_the_slf <- function(df, workbook_name, level) {
     else {stop("This workbook does not have a defined filter function yet")}}
   else {stop("Not a valid workbook name")}
 }
-
-

@@ -3,14 +3,8 @@
 \docType{data}
 \name{workbook_names}
 \alias{workbook_names}
-\title{List with three levels, one for each security level on Source platform}
-\format{
-An object of class \code{list} of length 3.
-}
-\usage{
-workbook_names
-}
+\title{workbook_names}
 \description{
-For reference
+List with three levels, one for each security level on Source platform, for reference
 }
 \keyword{data}

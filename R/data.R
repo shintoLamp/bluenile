@@ -17,14 +17,14 @@
 #' @keywords data
 "lca_names"
 
-#' List with three levels, one for each security level on Source platform
+#' workbook_names
 #'
-#' For reference
+#' List with three levels, one for each security level on Source platform, for reference
 #'
 #' @name workbook_names
 #' @docType data
 #' @keywords data
-"workbook_names"
+NULL
 
 #' List of vectors, each member of which is a variable from the SLFs.
 #'

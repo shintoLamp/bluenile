@@ -3,6 +3,8 @@
 export("%>%")
 export(filter_the_slf)
 export(get_locality_lookup)
+export(get_nrf_dir)
+export(get_specialty_lookup)
 export(lcaname_to_hb)
 export(specialty_lookup)
 export(twodigitla_to_hb)

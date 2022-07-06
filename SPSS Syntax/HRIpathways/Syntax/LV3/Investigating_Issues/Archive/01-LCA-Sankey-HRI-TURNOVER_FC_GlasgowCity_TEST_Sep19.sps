@@ -1,0 +1,1277 @@
+﻿* Encoding: UTF-8.
+**********************************************************************************************************************************************************************
+*******************************Syntax to produce data for Sankey chart for Dashboard 2 of HRI Pathways workbook***********************************.
+*******************************BEWARE - Running time of 1+ days - Please ensure large file space before running**********************************.
+
+***FC Oct. 2018. Updated variables which have been renamed/reformatted to reflect changes in Source Linkage Files
+    Renamed variables: 'death_date' back to 'death_date', pc7 to postcode
+    Reformatted variables: dob (from date to numeric), gpprac (from date back to numeric)
+    Changed codes:  lca codes for 'Fife' and 'Perth & Kinross'.
+
+* File save location.
+define !OFilesL()
+       '/conf/sourcedev/TableauUpdates/HRIpathways/Outputs/LV3/Checks/GlasgowCity/'
+!Enddefine.
+
+
+
+******************************************************************
+*************************************************************************************************************************************************.
+*** Start with first financial year (2014/2015).
+Define !year()
+'201415'
+!Enddefine.
+
+get file = '/conf/hscdiip/01-Source-linkage-files/source-individual-file-' + !year + '.zsav'.
+select if gender ne 0.
+select if hri_scot ne 9.
+execute.
+
+select if lca='17'.
+execute.
+
+alter type postcode (A21).
+*execute.
+*Create a Scottish flag for the people we know are definitely Scottish as they have a Scottish postcode. 
+*Sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP1.sav'
+/by postcode.
+*execute. 
+
+
+*delete variables PC_District.
+String PCDistrict (A12).
+Compute PCDistrict = char.substr(postcode,1,4).
+execute. 
+
+
+sort cases by pcDistrict.
+match files file = *
+/table = '/conf/sourcedev/TableauUpdates/HRIpathways/ScotLookup.sav'
+/by PCDistrict.
+execute.
+
+*Reformat 'gpprac' back from numeric to string.
+String gpprac_str(A5).
+compute gpprac_str = string(gpprac,F5.0).
+execute.
+
+*Flag people as Scottish if they have a blank postcode and blank gpprac - we assume that these people are Scottish. 
+If postcode = " " and gpprac_str= " " ScotFlag = 1.
+execute. 
+
+*Finally, we exclude people who have a blank postcode and an English GPprac. 
+*FC Oct. 2018 Update.
+*If a GP practice is English will be recorded as '99995' (Oct. 2018 Source Linkage Update). 
+
+String Eng_Flag (A1).
+If gpprac_str='99995' Eng_Flag='1'.
+If (postcode = "" and Eng_Flag ne '1') scotflag=1.
+If (postcode='null' and Eng_Flag ne '1') scotflag = 1.
+execute. 
+
+*974 people with English GPs.
+*frequencies Eng_Flag.
+
+
+*There are some Glasgow postcodes which have not been recognised as Scottish so have to include these. 
+String Glasgow_Flag (A2).
+Compute Glasgow_Flag = char.substr(postcode,1,2).
+execute.
+
+If Any(Glasgow_Flag, 'G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9' ) Scotflag = 1.
+*There are still a lot of Scottish people so use the Glasgow flag to identify the following.
+If Any(Glasgow_Flag, 'DD', 'EH', 'IV', 'AB', 'KA', 'FK', 'HS', 'KW', 'KY', 'ML', 'PA', 'PH','ZE') Scotflag = 1.
+execute. 
+
+recode scotflag (sysmis=0).
+
+*sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP2.sav'
+/by PC7.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*frequencies variables = scotflag.
+
+
+*frequencies variables = pcDistrict.
+*rename variables PC_District = PCDistrict.
+*alter type PCDistrict (A18). 
+*match files file =*
+/Table = !clout + 'Postcode_district_from_standard_ref.sav'
+/by PCDistrict.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*FREQUENCIES VARIABLES=ScotFlag
+  /ORDER=ANALYSIS.
+
+*2010/11 5095 excluded.
+*2011/12 5039 excluded. 
+*2012/13 6265 excluded. 
+*2013/14 8266 excluded. 
+
+*Way of checking Non-Scottish people you are about to exclude.
+String NonScot (A7).
+Compute NonScot = ''.
+If Scotflag ne 1 NonScot = postcode.
+*FREQUENCIES VARIABLES=NonScot
+  /ORDER=ANALYSIS.
+
+
+*Select if Scot_Flag = 1.
+*execute. 
+
+Delete variables Glasgow_Flag Eng_Flag.
+
+*Select only those people with postcode and GPprac info (excluding English GPs).
+select if scotflag = 1.
+execute. 
+Delete variables Scotflag.
+
+
+String HRI_Group (A30).
+* Create HRI grouping.
+if (HRI_lcaP lt 50) HRI_Group = 'High'.
+if (HRI_lcaP ge 50 and HRI_lcaP lt 65) HRI_Group = 'High to Medium'.
+if (HRI_lcaP ge 65 and HRI_lcaP lt 80) HRI_Group = 'Medium'.
+if (HRI_lcaP ge 80 and HRI_lcaP lt 95) HRI_Group = 'Medium to Low'.
+if (HRI_lcaP ge 95) HRI_Group = 'Low'.
+if lca eq '' HRI_Group eq 'Not in LA'.
+execute.
+
+frequencies HRI_Group.
+
+* Adjust age to base year of latest year.
+
+*alter type dob (F8.0).
+*compute age= trunc((20160930-dob)/10000).
+*alter type age (F3.0).
+*execute.
+
+**FC Mar. 2019**
+** 'Age' information is included in the Source Linkage File, no need to calculate it based on dob as previously done.
+
+* Create required agebands.
+string AgeBand (a5).
+If (Age lt 18) AgeBand = '<18'.
+If (Age ge 18 and Age le 44) AgeBand = '18-44'.
+If (Age ge 45 and Age le 64) AgeBand = '45-64'.
+If (Age ge 65 and Age le 74) AgeBand = '65-74'.
+If (Age ge 75 and Age le 84) AgeBand = '75-84'.
+If (Age ge 85) AgeBand = '85+'.
+execute. 
+
+* Remove any individuals not within a LA.
+*select if lca NE ' '.
+*execute.
+
+rename variables (lca HRI_Group health_net_cost = LCA1415 HRI_Group1415 health_net_cost1415).
+
+rename variables Anon_CHI = chi. 
+
+sort cases by chi.
+
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1415 LCA1415
+  /health_net_cost1415_min=MIN(health_net_cost1415) 
+  /health_net_cost1415_max=MAX(health_net_cost1415).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1415_T1.sav'
+/keep year CHI gender health_net_cost1415 LCA1415  AgeBand LCA1415 HRI_Group1415 health_net_cost1415_min health_net_cost1415_max deceased death_date.
+
+*All ages.
+get file  = !OFilesL + 'temp_HRI_LA_1415_T1.sav'
+/keep year CHI gender health_net_cost1415 LCA1415  AgeBand LCA1415 HRI_Group1415 deceased death_date.
+
+compute AgeBand = 'All'.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1415 LCA1415
+  /health_net_cost1415_min=MIN(health_net_cost1415) 
+  /health_net_cost1415_max=MAX(health_net_cost1415).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1415_T2.sav'
+/keep year CHI gender health_net_cost1415 LCA1415  AgeBand LCA1415 HRI_Group1415 health_net_cost1415_min health_net_cost1415_max deceased death_date.
+
+* By Gender.
+get file  = !OFilesL + 'temp_HRI_LA_1415_T1.sav'
+/keep year CHI gender health_net_cost1415 LCA1415  AgeBand LCA1415 HRI_Group1415 deceased death_date.
+
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1415 LCA1415
+  /health_net_cost1415_min=MIN(health_net_cost1415) 
+  /health_net_cost1415_max=MAX(health_net_cost1415).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1415_T3.sav'
+/keep year CHI gender health_net_cost1415 LCA1415  AgeBand LCA1415 HRI_Group1415 health_net_cost1415_min health_net_cost1415_max deceased death_date.
+
+*Both Age and gender.
+get file  = !OFilesL + 'temp_HRI_LA_1415_T1.sav'
+/keep year CHI gender health_net_cost1415 LCA1415  AgeBand LCA1415 HRI_Group1415 deceased death_date.
+
+compute AgeBand = 'All'.
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1415 LCA1415
+  /health_net_cost1415_min=MIN(health_net_cost1415) 
+  /health_net_cost1415_max=MAX(health_net_cost1415).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1415_T4.sav'
+/keep year CHI gender health_net_cost1415 LCA1415  AgeBand LCA1415 HRI_Group1415 health_net_cost1415_min health_net_cost1415_max deceased death_date.
+
+add files file = !OFilesL + 'temp_HRI_LA_1415_T1.sav'
+/file = !OFilesL + 'temp_HRI_LA_1415_T2.sav'
+/file = !OFilesL + 'temp_HRI_LA_1415_T3.sav'
+/file = !OFilesL + 'temp_HRI_LA_1415_T4.sav'.
+execute.
+
+sort cases by chi AgeBand gender.
+
+
+save outfile = !OFilesL + 'temp_HRI_LA_1415.sav'.
+
+
+* Tidy up.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1415_T1.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1415_T2.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1415_T3.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1415_T4.sav'.
+
+
+*** Fin. year 2015/2016.
+
+Define !year()
+'201516'
+!Enddefine.
+
+get file = '/conf/hscdiip/01-Source-linkage-files/source-individual-file-' + !year + '.zsav'.
+select if gender ne 0.
+select if hri_scot ne 9.
+
+select if lca='17'.
+execute.
+
+*Mar. 2019 FC. 
+*Non-Service Users must be excluded by the calculations (only for health activities from 2015/16 onwards)
+ Otherwise, these users will be counted in the 'Low Users' category.
+select if NSU ne 1.
+execute.
+
+
+alter type postcode (A21).
+*execute.
+*Create a Scottish flag for the people we know are definitely Scottish as they have a Scottish postcode. 
+*Sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP1.sav'
+/by postcode.
+*execute. 
+
+
+*delete variables PC_District.
+String PCDistrict (A12).
+Compute PCDistrict = char.substr(postcode,1,4).
+execute. 
+
+
+sort cases by pcDistrict.
+match files file = *
+/table = '/conf/sourcedev/TableauUpdates/HRIpathways/ScotLookup.sav'
+/by PCDistrict.
+execute.
+
+*Reformat 'gpprac' back from numeric to string.
+String gpprac_str(A5).
+compute gpprac_str = string(gpprac,F5.0).
+execute.
+
+*Flag people as Scottish if they have a blank postcode and blank gpprac - we assume that these people are Scottish. 
+If postcode = " " and gpprac_str= " " ScotFlag = 1.
+execute. 
+
+*Finally, we exclude people who have a blank postcode and an English GPprac. 
+*FC Mar. 2019 Update.
+*If a GP practice is English will be recorded as '99995' (Oct. 2018 Source Linkage Update). 
+
+String Eng_Flag (A1).
+If gpprac_str='99995' Eng_Flag='1'.
+If (postcode = "" and Eng_Flag ne '1') scotflag=1.
+If (postcode='null' and Eng_Flag ne '1') scotflag = 1.
+execute. 
+
+*14 people with English GPs.
+*frequencies Eng_Flag.
+
+*There are some Glasgow postcodes which have not been recognised as Scottish so have to include these. 
+String Glasgow_Flag (A2).
+Compute Glasgow_Flag = char.substr(postcode,1,2).
+execute.
+
+If Any(Glasgow_Flag, 'G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9' ) Scotflag = 1.
+*There are still a lot of Scottish people so use the Glasgow flag to identify the following.
+If Any(Glasgow_Flag, 'DD', 'EH', 'IV', 'AB', 'KA', 'FK', 'HS', 'KW', 'KY', 'ML', 'PA', 'PH','ZE') Scotflag = 1.
+execute. 
+
+recode scotflag (sysmis=0).
+
+*sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP2.sav'
+/by PC7.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*frequencies variables = scotflag.
+
+
+*frequencies variables = pcDistrict.
+*rename variables PC_District = PCDistrict.
+*alter type PCDistrict (A18). 
+*match files file =*
+/Table = !clout + 'Postcode_district_from_standard_ref.sav'
+/by PCDistrict.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*FREQUENCIES VARIABLES=ScotFlag
+  /ORDER=ANALYSIS.
+
+*2010/11 5095 excluded.
+*2011/12 5039 excluded. 
+*2012/13 6265 excluded. 
+*2013/14 8266 excluded. 
+
+*Way of checking Non-Scottish people you are about to exclude.
+String NonScot (A7).
+Compute NonScot = ''.
+If Scotflag ne 1 NonScot = postcode.
+*FREQUENCIES VARIABLES=NonScot
+  /ORDER=ANALYSIS.
+
+Delete variables  Glasgow_Flag Eng_Flag.
+ 
+
+select if scotflag = 1.
+execute. 
+Delete variables Scotflag.
+
+
+String HRI_Group (A30).
+* Create HRI grouping.
+if (HRI_lcaP lt 50) HRI_Group = 'High'.
+if (HRI_lcaP ge 50 and HRI_lcaP lt 65) HRI_Group = 'High to Medium'.
+if (HRI_lcaP ge 65 and HRI_lcaP lt 80) HRI_Group = 'Medium'.
+if (HRI_lcaP ge 80 and HRI_lcaP lt 95) HRI_Group = 'Medium to Low'.
+if (HRI_lcaP ge 95) HRI_Group = 'Low'.
+if lca eq '' HRI_Group eq 'Not in LA'.
+execute.
+
+frequencies HRI_Group.
+
+* Adjust age to base year of latest year.
+
+*alter type dob (F8.0).
+*compute age= trunc((20160930-dob)/10000).
+*alter type age (F3.0).
+*execute.
+
+**FC Mar. 2019**
+** 'Age' is already included in the Source Linkage File, no need to calculate it based on 'dob' as previously done.
+
+* Create required agebands.
+string AgeBand (a5).
+If (Age lt 18) AgeBand = '<18'.
+If (Age ge 18 and Age le 44) AgeBand = '18-44'.
+If (Age ge 45 and Age le 64) AgeBand = '45-64'.
+If (Age ge 65 and Age le 74) AgeBand = '65-74'.
+If (Age ge 75 and Age le 84) AgeBand = '75-84'.
+If (Age ge 85) AgeBand = '85+'.
+execute. 
+
+* Remove any individuals not within a LA.
+*select if lca NE ' '.
+
+rename variables (lca HRI_Group health_net_cost = LCA1516 HRI_Group1516 health_net_cost1516).
+
+rename variables Anon_CHI = chi. 
+
+sort cases by chi.
+
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1516 LCA1516
+  /health_net_cost1516_min=MIN(health_net_cost1516) 
+  /health_net_cost1516_max=MAX(health_net_cost1516).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1516_T1.sav'
+/keep year CHI gender health_net_cost1516 LCA1516  AgeBand LCA1516 HRI_Group1516 health_net_cost1516_min health_net_cost1516_max deceased death_date.
+
+*All ages.
+get file  = !OFilesL + 'temp_HRI_LA_1516_T1.sav'
+/keep year CHI gender health_net_cost1516 LCA1516  AgeBand LCA1516 HRI_Group1516 deceased death_date.
+
+compute AgeBand = 'All'.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1516 LCA1516
+  /health_net_cost1516_min=MIN(health_net_cost1516) 
+  /health_net_cost1516_max=MAX(health_net_cost1516).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1516_T2.sav'
+/keep year CHI gender health_net_cost1516 LCA1516 AgeBand LCA1516 HRI_Group1516 health_net_cost1516_min health_net_cost1516_max deceased death_date.
+
+* By Gender.
+get file  = !OFilesL + 'temp_HRI_LA_1516_T1.sav'
+/keep year CHI gender health_net_cost1516 LCA1516 AgeBand LCA1516 HRI_Group1516 deceased death_date.
+
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1516 LCA1516
+  /health_net_cost1516_min=MIN(health_net_cost1516) 
+  /health_net_cost1516_max=MAX(health_net_cost1516).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1516_T3.sav'
+/keep year CHI gender health_net_cost1516 LCA1516 AgeBand LCA1516 HRI_Group1516 health_net_cost1516_min health_net_cost1516_max deceased death_date.
+
+*Both Age and gender.
+get file  = !OFilesL + 'temp_HRI_LA_1516_T1.sav'
+/keep year CHI gender health_net_cost1516 LCA1516 AgeBand LCA1516 HRI_Group1516 deceased death_date.
+
+compute AgeBand = 'All'.
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1516 LCA1516
+  /health_net_cost1516_min=MIN(health_net_cost1516) 
+  /health_net_cost1516_max=MAX(health_net_cost1516).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1516_T4.sav'
+/keep year CHI gender health_net_cost1516 LCA1516 AgeBand LCA1516 HRI_Group1516 health_net_cost1516_min health_net_cost1516_max deceased death_date.
+
+add files file = !OFilesL + 'temp_HRI_LA_1516_T1.sav'
+/file = !OFilesL + 'temp_HRI_LA_1516_T2.sav'
+/file = !OFilesL + 'temp_HRI_LA_1516_T3.sav'
+/file = !OFilesL + 'temp_HRI_LA_1516_T4.sav'.
+execute.
+
+sort cases by chi AgeBand gender.
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1516.sav'.
+
+* Tidy up.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1516_T1.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1516_T2.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1516_T3.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1516_T4.sav'.
+
+
+
+*Fin. Year  2016/2017
+*Macro 1.
+Define !year()
+'201617'
+!Enddefine.
+
+get file = '/conf/hscdiip/01-Source-linkage-files/source-individual-file-' + !year + '.zsav'.
+select if gender ne 0.
+select if hri_scot ne 9.
+
+select if lca='17'.
+execute.
+
+*Mar. 2019 FC. 
+*Non-Service Users must be excluded by the calculations (only for health activities from 2015/16 onwards)
+ Otherwise, these users will be counted in the 'Low Users' category.
+select if NSU ne 1.
+execute.
+
+
+alter type postcode (A21).
+*execute.
+*Create a Scottish flag for the people we know are definitely Scottish as they have a Scottish postcode. 
+*Sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP1.sav'
+/by postcode.
+*execute. 
+
+
+*delete variables PC_District.
+String PCDistrict (A12).
+Compute PCDistrict = char.substr(postcode,1,4).
+execute. 
+
+
+sort cases by pcDistrict.
+match files file = *
+/table = '/conf/sourcedev/TableauUpdates/HRIpathways/ScotLookup.sav'
+/by PCDistrict.
+execute.
+
+
+*Reformat 'gpprac' back from numeric to string.
+String gpprac_str(A5).
+compute gpprac_str = string(gpprac,F5.0).
+execute.
+
+*Flag people as Scottish if they have a blank postcode and blank gpprac - we assume that these people are Scottish. 
+If postcode = " " and gpprac_str= " " ScotFlag = 1.
+execute. 
+
+*Finally, we exclude people who have a blank postcode and an English GPprac. 
+*FC Oct. 2018 Update.
+*If a GP practice is English will be recorded as '99995' (Oct. 2018 Source Linkage Update). 
+
+String Eng_Flag (A1).
+If gpprac_str='99995' Eng_Flag='1'.
+If (postcode = "" and Eng_Flag ne '1') scotflag=1.
+If (postcode='null' and Eng_Flag ne '1') scotflag = 1.
+execute. 
+
+
+
+*There are some Glasgow postcodes which have not been recognised as Scottish so have to include these. 
+String Glasgow_Flag (A2).
+Compute Glasgow_Flag = char.substr(postcode,1,2).
+execute.
+
+If Any(Glasgow_Flag, 'G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9' ) Scotflag = 1.
+*There are still a lot of Scottish people so use the Glasgow flag to identify the following.
+If Any(Glasgow_Flag, 'DD', 'EH', 'IV', 'AB', 'KA', 'FK', 'HS', 'KW', 'KY', 'ML', 'PA', 'PH','ZE') Scotflag = 1.
+execute. 
+
+recode scotflag (sysmis=0).
+
+*sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP2.sav'
+/by PC7.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*frequencies variables = scotflag.
+
+
+*frequencies variables = pcDistrict.
+*rename variables PC_District = PCDistrict.
+*alter type PCDistrict (A18). 
+*match files file =*
+/Table = !clout + 'Postcode_district_from_standard_ref.sav'
+/by PCDistrict.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*FREQUENCIES VARIABLES=ScotFlag
+  /ORDER=ANALYSIS.
+
+*2010/11 5095 excluded.
+*2011/12 5039 excluded. 
+*2012/13 6265 excluded. 
+*2013/14 8266 excluded. 
+
+*Way of checking Non-Scottish people you are about to exclude.
+String NonScot (A7).
+Compute NonScot = ''.
+If Scotflag ne 1 NonScot = postcode.
+FREQUENCIES VARIABLES=NonScot
+  /ORDER=ANALYSIS.
+
+
+Delete variables Glasgow_Flag Eng_Flag.
+ 
+
+select if scotflag = 1.
+execute.
+ 
+Delete variables Scotflag.
+
+
+String HRI_Group (A30).
+* Create HRI grouping.
+if (HRI_lcaP lt 50) HRI_Group = 'High'.
+if (HRI_lcaP ge 50 and HRI_lcaP lt 65) HRI_Group = 'High to Medium'.
+if (HRI_lcaP ge 65 and HRI_lcaP lt 80) HRI_Group = 'Medium'.
+if (HRI_lcaP ge 80 and HRI_lcaP lt 95) HRI_Group = 'Medium to Low'.
+if (HRI_lcaP ge 95) HRI_Group = 'Low'.
+if lca eq '' HRI_Group eq 'Not in LA'.
+execute.
+
+frequencies HRI_Group.
+
+* Adjust age to base year of latest year.
+
+*alter type dob (F8.0).
+*compute age= trunc((20160930-dob)/10000).
+*alter type age (F3.0).
+*execute.
+
+**FC Mar. 2019**
+** 'Age' information is included in the Source Linkage File, no need to calculate it based on dob as previously done.
+
+
+* Create required agebands.
+string AgeBand (a5).
+If (Age lt 18) AgeBand = '<18'.
+If (Age ge 18 and Age le 44) AgeBand = '18-44'.
+If (Age ge 45 and Age le 64) AgeBand = '45-64'.
+If (Age ge 65 and Age le 74) AgeBand = '65-74'.
+If (Age ge 75 and Age le 84) AgeBand = '75-84'.
+If (Age ge 85) AgeBand = '85+'.
+execute. 
+
+* Remove any individuals not within a LA.
+*select if lca NE ' '.
+
+rename variables (lca HRI_Group health_net_cost = LCA1617 HRI_Group1617 health_net_cost1617).
+
+rename variables Anon_CHI = chi. 
+
+sort cases by chi.
+
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1617 LCA1617
+  /health_net_cost1617_min=MIN(health_net_cost1617) 
+  /health_net_cost1617_max=MAX(health_net_cost1617).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1617_T1.sav'
+/keep year CHI gender health_net_cost1617 LCA1617  AgeBand LCA1617 HRI_Group1617 health_net_cost1617_min health_net_cost1617_max deceased death_date.
+
+*All ages.
+get file  = !OFilesL + 'temp_HRI_LA_1617_T1.sav'
+/keep year CHI gender health_net_cost1617 LCA1617  AgeBand LCA1617 HRI_Group1617 deceased death_date.
+
+compute AgeBand = 'All'.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1617 LCA1617
+  /health_net_cost1617_min=MIN(health_net_cost1617) 
+  /health_net_cost1617_max=MAX(health_net_cost1617).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1617_T2.sav'
+/keep year CHI gender health_net_cost1617 LCA1617  AgeBand LCA1617 HRI_Group1617 health_net_cost1617_min health_net_cost1617_max deceased death_date.
+
+* By Gender.
+get file  = !OFilesL + 'temp_HRI_LA_1617_T1.sav'
+/keep year CHI gender health_net_cost1617 LCA1617  AgeBand LCA1617 HRI_Group1617 deceased death_date.
+
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1617 LCA1617
+  /health_net_cost1617_min=MIN(health_net_cost1617) 
+  /health_net_cost1617_max=MAX(health_net_cost1617).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1617_T3.sav'
+/keep year CHI gender health_net_cost1617 LCA1617  AgeBand LCA1617 HRI_Group1617 health_net_cost1617_min health_net_cost1617_max deceased death_date.
+
+*Both Age and gender.
+get file  = !OFilesL + 'temp_HRI_LA_1617_T1.sav'
+/keep year CHI gender health_net_cost1617 LCA1617  AgeBand LCA1617 HRI_Group1617 deceased death_date.
+
+compute AgeBand = 'All'.
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1617 LCA1617
+  /health_net_cost1617_min=MIN(health_net_cost1617) 
+  /health_net_cost1617_max=MAX(health_net_cost1617).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1617_T4.sav'
+/keep year CHI gender health_net_cost1617 LCA1617  AgeBand LCA1617 HRI_Group1617 health_net_cost1617_min health_net_cost1617_max deceased death_date.
+
+add files file = !OFilesL + 'temp_HRI_LA_1617_T1.sav'
+/file = !OFilesL + 'temp_HRI_LA_1617_T2.sav'
+/file = !OFilesL + 'temp_HRI_LA_1617_T3.sav'
+/file = !OFilesL + 'temp_HRI_LA_1617_T4.sav'.
+execute.
+
+sort cases by chi AgeBand gender.
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1617.sav'.
+
+
+* Tidy up.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1617_T1.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1617_T2.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1617_T3.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1617_T4.sav'.
+
+
+
+*Last Financial Year.
+Define !year()
+'201718'
+!Enddefine.
+
+get file = '/conf/hscdiip/01-Source-linkage-files/source-individual-file-' + !year + '.zsav'.
+select if gender ne 0.
+select if hri_scot ne 9.
+
+*Select only Aberdeen City Data. 
+select if lca='17'.
+execute.
+
+*Mar 2019 FC. 
+*Non-Service Users must be excluded by the calculations (only for health activities from 2015/16 onwards)
+ Otherwise, these users will be counted in the 'Low Users' category.
+select if NSU ne 1.
+execute.
+
+
+*rename variables health_postcode =pc7. 
+alter type postcode (A21).
+*execute.
+*Create a Scottish flag for the people we know are definitely Scottish as they have a Scottish postcode. 
+*Sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP1.sav'
+/by postcode.
+*execute. 
+
+*delete variables PC_District.
+String PCDistrict (A12).
+Compute PCDistrict = char.substr(postcode,1,4).
+execute. 
+
+
+
+sort cases by pcDistrict.
+match files file = *
+/table = '/conf/sourcedev/TableauUpdates/HRIpathways/ScotLookup.sav'
+/by PCDistrict.
+execute.
+
+*Reformat 'gpprac' back from numeric to string.
+String gpprac_str(A5).
+compute gpprac_str = string(gpprac,F5.0).
+execute.
+
+*Flag people as Scottish if they have a blank postcode and blank gpprac - we assume that these people are Scottish. 
+If postcode = " " and gpprac_str= " " ScotFlag = 1.
+execute. 
+
+*Finally, we exclude people who have a blank postcode and an English GPprac. 
+*FC Mar. 2019 Update.
+*If a GP practice is English will be recorded as '99995' (Oct. 2018 Source Linkage Update). 
+
+String Eng_Flag (A1).
+If gpprac_str='99995' Eng_Flag='1'.
+If (postcode = "" and Eng_Flag ne '1') scotflag=1.
+If (postcode='null' and Eng_Flag ne '1') scotflag = 1.
+execute. 
+
+
+
+*There are some Glasgow postcodes which have not been recognised as Scottish so have to include these. 
+String Glasgow_Flag (A2).
+Compute Glasgow_Flag = char.substr(postcode,1,2).
+execute.
+
+If Any(Glasgow_Flag, 'G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9' ) Scotflag = 1.
+*There are still a lot of Scottish people so use the Glasgow flag to identify the following.
+If Any(Glasgow_Flag, 'DD', 'EH', 'IV', 'AB', 'KA', 'FK', 'HS', 'KW', 'KY', 'ML', 'PA', 'PH','ZE') Scotflag = 1.
+execute. 
+
+recode scotflag (sysmis=0).
+
+*sort cases by postcode.
+*match files file =*
+/Table = '/conf/linkage/output/alisom18/New_Scot_Post_LKP2.sav'
+/by PC7.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*frequencies variables = scotflag.
+
+
+*frequencies variables = pcDistrict.
+*rename variables PC_District = PCDistrict.
+*alter type PCDistrict (A18). 
+*match files file =*
+/Table = !clout + 'Postcode_district_from_standard_ref.sav'
+/by PCDistrict.
+*execute. 
+*if scot_flag_1 = 1 scotflag = 1.
+*execute. 
+
+*FREQUENCIES VARIABLES=ScotFlag
+  /ORDER=ANALYSIS.
+
+*2010/11 5095 excluded.
+*2011/12 5039 excluded. 
+*2012/13 6265 excluded. 
+*2013/14 8266 excluded. 
+
+*Way of checking Non-Scottish people you are about to exclude.
+String NonScot (A7).
+Compute NonScot = ''.
+If Scotflag ne 1 NonScot = postcode.
+*FREQUENCIES VARIABLES=NonScot
+  /ORDER=ANALYSIS.
+
+
+Delete variables Glasgow_Flag Eng_Flag.
+ 
+
+select if scotflag = 1.
+execute. 
+Delete variables Scotflag.
+
+String HRI_Group (A30).
+* Create HRI grouping.
+if (HRI_lcaP lt 50) HRI_Group = 'High'.
+if (HRI_lcaP ge 50 and HRI_lcaP lt 65) HRI_Group = 'High to Medium'.
+if (HRI_lcaP ge 65 and HRI_lcaP lt 80) HRI_Group = 'Medium'.
+if (HRI_lcaP ge 80 and HRI_lcaP lt 95) HRI_Group = 'Medium to Low'.
+if (HRI_lcaP ge 95) HRI_Group = 'Low'.
+if lca eq '' HRI_Group eq 'Not in LA'.
+execute.
+
+frequencies HRI_Group.
+
+* Adjust age to base year of latest year.
+
+*alter type dob (F8.0).
+*compute age= trunc((20160930-dob)/10000).
+*alter type age (F3.0).
+*execute.
+
+**FC Mar. 2019**
+** 'Age' is already included in the Source Linkage File, no need to calculate it based on dob as previously done.
+
+*compute Age = Age + 1.
+*execute.
+
+* Create required agebands.
+string AgeBand (a5).
+If (Age lt 18) AgeBand = '<18'.
+If (Age ge 18 and Age le 44) AgeBand = '18-44'.
+If (Age ge 45 and Age le 64) AgeBand = '45-64'.
+If (Age ge 65 and Age le 74) AgeBand = '65-74'.
+If (Age ge 75 and Age le 84) AgeBand = '75-84'.
+If (Age ge 85) AgeBand = '85+'.
+execute. 
+
+* Remove any individuals not within a LA.
+*select if lca NE ' '.
+
+rename variables (lca HRI_Group health_net_cost = LCA1718 HRI_Group1718 health_net_cost1718).
+
+rename variables Anon_CHI = chi. 
+
+sort cases by chi.
+
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1718 LCA1718
+  /health_net_cost1718_min=MIN(health_net_cost1718) 
+  /health_net_cost1718_max=MAX(health_net_cost1718).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1718_T1.sav'
+/keep year CHI gender health_net_cost1718 LCA1718  AgeBand LCA1718 HRI_Group1718 health_net_cost1718_min health_net_cost1718_max deceased death_date.
+
+*All ages.
+get file  = !OFilesL + 'temp_HRI_LA_1718_T1.sav'
+/keep year CHI gender health_net_cost1718 LCA1718  AgeBand LCA1718 HRI_Group1718 deceased death_date.
+
+compute AgeBand = 'All'.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1718 LCA1718
+  /health_net_cost1718_min=MIN(health_net_cost1718) 
+  /health_net_cost1718_max=MAX(health_net_cost1718).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1718_T2.sav'
+/keep year CHI gender health_net_cost1718 LCA1718  AgeBand LCA1718 HRI_Group1718 health_net_cost1718_min health_net_cost1718_max deceased death_date.
+
+* By Gender.
+get file  = !OFilesL + 'temp_HRI_LA_1718_T1.sav'
+/keep year CHI gender health_net_cost1718 LCA1718  AgeBand LCA1718 HRI_Group1718 deceased death_date.
+
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1718 LCA1718
+  /health_net_cost1718_min=MIN(health_net_cost1718) 
+  /health_net_cost1718_max=MAX(health_net_cost1718).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1718_T3.sav'
+/keep year CHI gender health_net_cost1718 LCA1718  AgeBand LCA1718 HRI_Group1718 health_net_cost1718_min health_net_cost1718_max deceased death_date.
+
+*Both Age and gender.
+get file  = !OFilesL + 'temp_HRI_LA_1718_T1.sav'
+/keep year CHI gender health_net_cost1718 LCA1718  AgeBand LCA1718 HRI_Group1718 deceased death_date.
+
+compute AgeBand = 'All'.
+compute gender = 0.
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=AgeBand gender HRI_Group1718 LCA1718
+  /health_net_cost1718_min=MIN(health_net_cost1718) 
+  /health_net_cost1718_max=MAX(health_net_cost1718).
+
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1718_T4.sav'
+/keep year CHI gender health_net_cost1718 LCA1718  AgeBand LCA1718 HRI_Group1718 health_net_cost1718_min health_net_cost1718_max deceased death_date.
+
+add files file = !OFilesL + 'temp_HRI_LA_1718_T1.sav'
+/file = !OFilesL + 'temp_HRI_LA_1718_T2.sav'
+/file = !OFilesL + 'temp_HRI_LA_1718_T3.sav'
+/file = !OFilesL + 'temp_HRI_LA_1718_T4.sav'.
+execute.
+
+sort cases by chi AgeBand gender.
+
+save outfile  = !OFilesL + 'temp_HRI_LA_1718.sav'.
+
+
+
+
+* Tidy up.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1718_T1.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1718_T2.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1718_T3.sav'.
+ERASE file  = !OFilesL + 'temp_HRI_LA_1718_T4.sav'.
+
+
+*************************************************************************************************************************************************.
+
+************************************************************************************.
+*Bring all files together (Including saved data for 2014/15, 2015/16).
+
+Get file  = !OFilesL + 'temp_HRI_LA_1718.sav'.
+
+****Rename deceased_flag to deceased for 1415, 1516 data and update lca codes for 'Fife' and 'Perth & Kinross' ****.
+match files file = *
+/file =  !OFilesL + 'temp_HRI_LA_1617.sav'
+/file =  !OFilesL + 'temp_HRI_LA_1516.sav'
+/file =  !OFilesL + 'temp_HRI_LA_1415.sav'
+/by chi AgeBand gender.
+execute.
+
+* Convert LA variable to a number.
+alter type LCA1718 (F2.0).
+alter type LCA1516 (F2.0).
+alter type LCA1415 (F2.0).
+alter type LCA1617 (F2.0).
+
+*Converting 'death_date' variable format from 'Date' back to 'Numeric' for the following calculations.
+alter type death_date (edate).
+alter type death_date (A10).
+
+String new_dod (A8).
+Compute new_dod=concat(char.substr(death_date ,7,4),char.substr(death_date ,4,2),char.substr(death_date ,1,2)).
+execute.
+
+*Create Numeric 'death_date' consistently with the rest of the sysntax.
+Compute date_death = number(new_dod,f8.0).
+execute.
+
+alter type date_death (F8).
+
+save outfile  = !OFilesL + 'temp_HRI_LA_MASTER_ALLYR.sav'.
+
+
+* Tidy up.
+ERASE file  =  !OFilesL + 'temp_HRI_LA_1718.sav'.
+ERASE file  =  !OFilesL + 'temp_HRI_LA_1415.sav'.
+ERASE file  =  !OFilesL + 'temp_HRI_LA_1516.sav'.
+ERASE file  =  !OFilesL + 'temp_HRI_LA_1617.sav'.
+
+
+
+** Now need to create individual LA records to track individuals overtime.
+get file  = !OFilesL + 'temp_HRI_LA_MASTER_ALLYR.sav'.
+
+*Set LA.
+compute x = 17.
+execute.
+
+* Identify selected individuals in selected LA.
+
+compute lcaFlag = 0.
+if LCA1718 = x lcaFlag = 1.
+if LCA1415 = x lcaFlag = 1.
+if LCA1516 = x lcaFlag = 1.
+if LCA1617 = x lcaFlag = 1.
+
+select if lcaFlag = 1.
+execute.
+ 
+* Identify any individuals that wheren't in selected area.
+if LCA1718 ne x HRI_Group1718 = 'Not in LA'.
+if LCA1415 ne x HRI_Group1415 = 'Not in LA'.
+if LCA1516 ne x HRI_Group1516 = 'Not in LA'.
+if LCA1617 ne x HRI_Group1617 = 'Not in LA'.
+execute.
+
+
+* Add death marker.
+if date_death < 20170401 HRI_Group1718 = 'Died'.
+if date_death < 20160401 HRI_Group1617 = 'Died'.
+if date_death < 20150401 HRI_Group1516 = 'Died'.
+if date_death > 20170401 and HRI_Group1718 = ' ' HRI_Group1718 = 'Died'.
+execute.
+
+
+* Assume any blanks are now showing no contact in year.
+if HRI_Group1617 = ' ' HRI_Group1617 = 'No Contact'.
+if HRI_Group1516 = ' ' HRI_Group1516 = 'No Contact'.
+if HRI_Group1415 = ' ' HRI_Group1415 = 'No Contact'.
+if HRI_Group1718 = ' ' HRI_Group1718 = 'No Contact'.
+execute.
+
+* Correct some codings where individuals dies after moving LA. If no contact can assume stayed in same LA..
+if HRI_Group1516 = "Died" and HRI_Group1415 = "Not in LA" HRI_Group1516 = "Not in LA".
+if HRI_Group1617 = "Died" and HRI_Group1516 = "Not in LA" HRI_Group1617 = "Not in LA".
+if HRI_Group1718 = "Died" and HRI_Group1617 = "Not in LA" HRI_Group1718 = "Not in LA".
+execute.
+
+
+* Remove Costs data for those not in LA.
+if HRI_Group1617 = "Not in LA" health_net_cost1617 = 0.
+if HRI_Group1516 = "Not in LA" health_net_cost1516 = 0.
+if HRI_Group1415 = "Not in LA" health_net_cost1415 = 0.
+if HRI_Group1718 = "Not in LA" health_net_cost1718 = 0.
+execute.
+
+* Remove Costs data for those Died before start of FY.
+if HRI_Group1617 = "Died" health_net_cost1617 = 0.
+if HRI_Group1516 = "Died" health_net_cost1516 = 0.
+if HRI_Group1415 = "Died" health_net_cost1415 = 0.
+if HRI_Group1718 = "Died" health_net_cost1718 = 0.
+execute.
+
+
+compute lca_Select = x.
+execute.
+
+* Convert gender to a string.
+String GenderSTR (A6).
+if gender = 1 GenderSTR = "Male".
+if gender = 2 GenderSTR = "Female".
+if gender = 0 GenderSTR = "Both".
+execute.
+
+save outfile  = !OFilesL + 'temp_HRI_LAT1.sav'.
+
+* Need to create a PathwayID for each level within the data.
+* Individual - Lowest level.
+get file  = !OFilesL + 'temp_HRI_LAT1.sav'.
+
+select if  GenderSTR NE "Both".
+select if AgeBand NE "All".
+execute.
+
+
+string PathwayLKP (A100).
+
+compute PathwayLKP = concat(rtrim(HRI_Group1415), rtrim(HRI_Group1516), rtrim(HRI_Group1617), rtrim(HRI_Group1718)).
+execute.
+
+save outfile  = !OFilesL + 'temp_HRI_LAT2.sav'.
+
+* Agg Age.
+get file  = !OFilesL + 'temp_HRI_LAT1.sav'.
+
+select if AgeBand = "All".
+select if  GenderSTR NE "Both".
+execute.
+
+string PathwayLKP (A100).
+
+compute PathwayLKP = concat(rtrim(HRI_Group1415), rtrim(HRI_Group1516), rtrim(HRI_Group1617), rtrim(HRI_Group1718)).
+execute. 
+
+save outfile  = !OFilesL + 'temp_HRI_LAT3.sav'.
+
+* Agg Gender.
+get file  = !OFilesL + 'temp_HRI_LAT1.sav'.
+
+select if GenderSTR = "Both".
+select if AgeBand NE "All".
+execute.
+
+string PathwayLKP (A100).
+
+compute PathwayLKP = concat(rtrim(HRI_Group1415), rtrim(HRI_Group1516), rtrim(HRI_Group1617), rtrim(HRI_Group1718)).
+execute. 
+
+save outfile  = !OFilesL + 'temp_HRI_LAT4.sav'.
+
+* Agg Age & Gender.
+get file  = !OFilesL + 'temp_HRI_LAT1.sav'.
+
+select if  GenderSTR = "Both".
+select if AgeBand = "All".
+execute.
+
+string PathwayLKP (A100).
+
+compute PathwayLKP = concat(rtrim(HRI_Group1415), rtrim(HRI_Group1516), rtrim(HRI_Group1617), rtrim(HRI_Group1718)).
+execute. 
+
+save outfile  = !OFilesL + 'temp_HRI_LAT5.sav'.
+
+*bring files togther.
+add files file = !OFilesL + 'temp_HRI_LAT2.sav'
+/file = !OFilesL + 'temp_HRI_LAT3.sav'
+/file = !OFilesL + 'temp_HRI_LAT4.sav'
+/file = !OFilesL + 'temp_HRI_LAT5.sav'.
+execute.
+
+*Remove all spaces from PathwayLKP.
+COMPUTE PathwayLKP = REPLACE(PathwayLKP, " ", "").
+execute.
+
+* Each individuals pathway should be recorded 6 times, if valid. There are issues with mapping CHI over years therefore mismatches which need to be removed.
+string PathwayXCheck (A100).
+Compute PathwayXCheck = CONCAT(CHI, PathwayLKP).
+execute.
+
+sort cases by PathwayXCheck.
+
+compute check = 1.
+if (lag(PathwayXCheck)=PathwayXCheck) check=lag(check)+1. 
+execute.
+
+AGGREGATE
+  /OUTFILE=* MODE=ADDVARIABLES
+  /BREAK=PathwayXCheck
+  /check_max=MAX(check).
+
+compute Remove = 0.
+if check_max < 4 Remove = 1.
+execute.
+
+* Modify PathwayLKP to include LA details.
+compute PathwayLKP = concat(STRING (lca_Select,F8),PathwayLKP).
+execute.
+*Remove all spaces from PathwayLKP.
+COMPUTE PathwayLKP = REPLACE(PathwayLKP, " ", "").
+execute.
+* Create a Pathway Label for use in Tableau.
+string PathwayLabel (A100).
+execute.
+
+compute PathwayLabel = concat(HRI_Group1415, ' - ', HRI_Group1516, ' - ', HRI_Group1617, HRI_Group1718, ' - ').
+execute. 
+
+* Need to save out Pathway lookup to match on the original CHIMASTER level data.
+save outfile  = !OFilesL + 'temp_HRI_LA_ALLYR_CHI1.sav'
+/keep chi lca_select PathwayLKP PathwayLabel HRI_Group1718 HRI_Group1617 HRI_Group1415 HRI_Group1516 Remove.
+
+* Remove mis-match records.
+*select if Remove NE 1.
+*execute.
+
+AGGREGATE
+  /OUTFILE=*
+  /BREAK=lca_Select genderSTR AgeBand HRI_Group1617 HRI_Group1718 HRI_Group1415 HRI_Group1516 PathwayLKP PathwayLabel
+  /health_net_cost1617=SUM(health_net_cost1617) 
+  /health_net_cost1718=SUM(health_net_cost1718)
+  /health_net_cost1415=SUM(health_net_cost1415) 
+  /health_net_cost1516=SUM(health_net_cost1516) 
+  /health_net_cost1617_min=MIN(health_net_cost1617_min) 
+  /health_net_cost1617_max=MAX(health_net_cost1617_max)
+  /health_net_cost1718_min=MIN(health_net_cost1718_min) 
+  /health_net_cost1718_max=MAX(health_net_cost1718_max)
+  /health_net_cost1415_min=MIN(health_net_cost1415_min) 
+  /health_net_cost1415_max=MAX(health_net_cost1415_max)
+  /health_net_cost1516_min=MIN(health_net_cost1516_min) 
+  /health_net_cost1516_max=MAX(health_net_cost1516_max)
+  /Size=N.
+
+save outfile  = !OFilesL + 'temp_HRI_LA_ALLYR1.sav'.
+
+
+***********************************************************************************.
+*get file = !OFilesL + 'temp_HRI_LA_ALLYR1.sav'.
+
+
+*add files file = *
+/file='/conf/linkage/output/euanpa01/Sankey_Link_dataset_Dummy.sav'.
+
+*string Link (A4).
+*Compute Link = "link".
+*execute.
+*if AgeBand = "All" AgeBand = "All ages".
+*execute.
+
+*string Data (A25).
+*compute Data = "Sankey".
+*execute.
+
+*Select if PathwayLabel NE "Remove".
+*execute.
+
+*SAVE OUTFILE='/conf/irf/01-CPTeam/02-Functional-outputs/09-Tableau-Outputs/01-Development/02-SPSS-Outputs/03-HRI/Sankey_Link_dataset_FINAL.sav'
+  /COMPRESSED.
+
+*get FILE='/conf/irf/01-CPTeam/02-Functional-outputs/09-Tableau-Outputs/01-Development/02-SPSS-Outputs/03-HRI/Sankey_Link_dataset_FINAL.sav'.
+
+************************************************************************************************************************************************************************************.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+************************************Aggregate Non-HRIs for Alternative Chart*****************************************.  
+*****************Chart just looks at HRIs/Non-HRIs/Died for demo purposes - Not Part of Main Output**********.
+

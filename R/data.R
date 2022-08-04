@@ -35,3 +35,11 @@ NULL
 #' @keywords data
 "variables_to_extract"
 
+#' List of vectors, relating to variables in the production of
+#' Hospital-Expenditure-and-Activity
+#'
+#' @name hea_constants
+#' @docType data
+#' @keywords data
+"hea_constants"
+

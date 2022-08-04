@@ -5,16 +5,13 @@
 \title{Read in most recent Geography team locality lookup file}
 \usage{
 get_locality_lookup(
-  suffix,
   columns,
   aggregate = FALSE,
-  matching_variable,
-  new_variables
+  matching_variable = NULL,
+  new_variables = NULL
 )
 }
 \arguments{
-\item{suffix}{A string in "YYYYMMDD" format correlating to most recent geography file}
-
 \item{columns}{A character vector of columns}
 
 \item{aggregate}{Should the lookup be aggregated? (default FALSE)}
@@ -22,6 +19,8 @@ get_locality_lookup(
 \item{matching_variable}{The level to which the lookup should be aggregated}
 
 \item{new_variables}{The variable(s) you wish to match on to your dataset}
+
+\item{suffix}{A string in "YYYYMMDD" format correlating to most recent geography file}
 }
 \value{
 A tibble with the selected columns to use as a lookup

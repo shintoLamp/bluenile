@@ -17,12 +17,14 @@
 #' y <- x <- get_locality_lookup("20200825", c("ca2019name", "ca2011"), aggregate = TRUE, ca2019name, ca2011)
 #'
 #' @family Lookups
-get_locality_lookup <- function(suffix,
-                                columns,
+get_locality_lookup <- function(columns,
                                 aggregate = FALSE,
-                                matching_variable,
-                                new_variables) {
-  return <- readr::read_rds(glue::glue("/conf/linkage/output/lookups/Unicode/Geography/HSCP Locality/HSCP Localities_DZ11_Lookup_{suffix}.rds")) %>%
+                                matching_variable = NULL,
+                                new_variables = NULL) {
+  return <- readr::read_rds(
+    find_latest_file(directory = "/conf/linkage/output/lookups/Unicode/Geography/HSCP Locality/",
+                     regexp = "HSCP Localities_DZ11_Lookup_\\d+?\\.rds")
+    ) %>%
     dplyr::select(dplyr::all_of(columns))
   if (aggregate == TRUE) {
     return <- return %>%
